@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced 3D Interactive Music Player</title>
+    <!-- Bootstrap CSS for basic layout -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js for 3D animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        /* Custom CSS with CSS variables for easy theme switching */
+        :root {
+            --bg-color: #0d0d0d;
+            --nav-bg-color: #1a1a1a;
+            --player-bg-color: #212121;
+            --text-color: #e0e0e0;
+            --accent-color: #ff3838;
+            --accent-color-hover: #ff6363;
+            --border-color: #333;
+            --box-shadow-color: rgba(0, 0, 0, 0.4);
+            --playlist-item-hover: #2b2b2b;
+        }
+
+        body.dark-red-theme {
+            --bg-color: #3b0d0d;
+            --nav-bg-color: #551414;
+            --player-bg-color: #4f1212;
+            --text-color: #f0f0f0;
+            --accent-color: #f7a700;
+            --accent-color-hover: #ffc94d;
+            --border-color: #662222;
+            --box-shadow-color: rgba(0, 0, 0, 0.5);
+            --playlist-item-hover: #5d2b2b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.5s ease;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+        }
+
+        .navbar {
+            background-color: var(--nav-bg-color);
+            box-shadow: 0 4px 12px var(--box-shadow-color);
+            padding: 1rem 1.5rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: var(--text-color);
+        }
+
+        .form-control {
+            background-color: var(--player-bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+        .form-control::placeholder {
+            color: #888;
+        }
+        .form-control:focus {
+            background-color: var(--player-bg-color);
+            border-color: var(--accent-color);
+            color: var(--text-color);
+            box-shadow: 0 0 0 0.25rem rgba(255, 56, 56, 0.25);
+        }
+
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 0;
+            min-height: 600px;
+        }
+
+        .music-player-container {
+            background-color: var(--player-bg-color);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 20px var(--box-shadow-color);
+            border: 1px solid var(--border-color);
+            transition: all 0.5s ease;
+            width: 100%;
+        }
+        
+        #drop-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 1rem;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            transition: border-color 0.3s ease;
+        }
+        #drop-area.highlight {
+            border-color: var(--accent-color);
+        }
+
+        #visualization-canvas {
+            width: 100%;
+            max-width: 400px;
+            height: 250px;
+            margin-bottom: 1rem;
+            border-radius: 0.75rem;
+            background-color: transparent;
+        }
+        
+        .track-info h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .track-info p {
+            font-size: 1rem;
+            color: #888;
+        }
+
+        .controls-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .control-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 8px var(--box-shadow-color);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .control-btn:hover {
+            transform: scale(1.1);
+            background-color: var(--accent-color-hover);
+            box-shadow: 0 6px 12px var(--box-shadow-color);
+        }
+        .control-btn.active {
+            background-color: var(--text-color);
+            color: var(--player-bg-color);
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background-color: #555;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: var(--accent-color);
+            border-radius: 5px;
+            width: 0;
+            transition: width 0.1s linear;
+        }
+        
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-top: 0.5rem;
+        }
+
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .volume-container input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100px;
+            height: 5px;
+            background: #555;
+            outline: none;
+            border-radius: 5px;
+        }
+        .volume-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .playlist-container {
+            margin-top: 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .playlist-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .playlist-container::-webkit-scrollbar-track {
+            background: var(--player-bg-color);
+            border-radius: 10px;
+        }
+        .playlist-container::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 10px;
+        }
+
+        .playlist-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .playlist-item:hover, .playlist-item.active {
+            background-color: var(--playlist-item-hover);
+        }
+        .playlist-item:last-child {
+            border-bottom: none;
+        }
+        .playlist-item-title {
+            flex-grow: 1;
+            margin-right: 1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .playlist-item .delete-btn {
+            background: none;
+            border: none;
+            color: #ff3838;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .theme-toggle {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            background-color: var(--nav-bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
+        }
+        .theme-toggle:hover {
+            background-color: var(--player-bg-color);
+        }
+
+        footer {
+            background-color: var(--nav-bg-color);
+            color: #888;
+            padding: 1rem;
+            text-align: center;
+            margin-top: auto;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .social-icons a {
+            color: var(--text-color);
+            margin: 0 0.5rem;
+            font-size: 1.2rem;
+            transition: color 0.3s ease;
+        }
+        .social-icons a:hover {
+            color: var(--accent-color);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .music-player-container {
+                width: 90%;
+            }
+            .controls-container {
+                flex-wrap: wrap;
+            }
+            .control-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid container">
+            <a class="navbar-brand" href="#">3D Music Player</a>
+            <button class="btn theme-toggle" id="theme-toggle">
+                <i class="fas fa-palette me-1"></i>Theme
+            </button>
+            <form class="d-flex ms-3">
+                <input class="form-control me-2" type="search" placeholder="Search Music" aria-label="Search">
+                <button class="btn btn-outline-light" type="submit">Search</button>
+            </form>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content d-flex justify-content-center">
+        <div class="row w-100">
+            <!-- Music Player Container -->
+            <div class="col-lg-6 mb-4">
+                <div class="music-player-container">
+                    <div class="text-center">
+                        <canvas id="visualization-canvas"></canvas>
+                    </div>
+                    
+                    <div class="track-info text-center">
+                        <h3 id="track-title">Upload a Song</h3>
+                        <p id="track-artist">Add a song to start</p>
+                    </div>
+
+                    <!-- Playback Controls -->
+                    <div class="controls-container">
+                        <button id="shuffle-btn" class="control-btn"><i class="fas fa-random"></i></button>
+                        <button id="prev-btn" class="control-btn"><i class="fas fa-backward"></i></button>
+                        <button id="play-pause-btn" class="control-btn"><i class="fas fa-play"></i></button>
+                        <button id="next-btn" class="control-btn"><i class="fas fa-forward"></i></button>
+                        <button id="repeat-btn" class="control-btn"><i class="fas fa-redo"></i></button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="progress-container" id="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    <div class="time-display">
+                        <span id="current-time">0:00</span>
+                        <span id="duration">0:00</span>
+                    </div>
+
+                    <!-- Volume Control -->
+                    <div class="volume-container">
+                        <i class="fas fa-volume-down"></i>
+                        <input type="range" id="volume-slider" min="0" max="100" value="70">
+                        <i class="fas fa-volume-up"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Playlist and File Upload -->
+            <div class="col-lg-6">
+                <div class="music-player-container h-100 d-flex flex-column">
+                    <div id="drop-area" class="d-flex flex-column align-items-center justify-content-center text-center">
+                        <p class="mb-2">Drag and drop music files here</p>
+                        <p class="mb-2 text-secondary">or</p>
+                        <label for="music-file-input" class="btn btn-outline-light">
+                            <i class="fas fa-upload me-2"></i> Select Files
+                        </label>
+                        <input type="file" id="music-file-input" accept="audio/*" multiple hidden>
+                    </div>
+                    
+                    <div class="mt-4 flex-grow-1 d-flex flex-column">
+                        <h4 class="mb-3">Playlist</h4>
+                        <div id="playlist-container" class="playlist-container flex-grow-1">
+                            <!-- Playlist items will be added here dynamically -->
+                            <p class="text-center text-muted m-3">No songs in the playlist.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 d-flex justify-content-between">
+                        <button id="save-playlist-btn" class="btn btn-secondary">Save Current Playlist</button>
+                        <button id="load-playlists-btn" class="btn btn-primary">Load Saved Playlists</button>
+                    </div>
+                    <div id="saved-playlists-list" class="playlist-container mt-3" style="display: none;">
+                        <!-- Saved playlists will be listed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="social-icons">
+                <a href="#"><i class="fab fa-facebook"></i></a>
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+                <a href="#"><i class="fab fa-youtube"></i></a>
+            </div>
+            <p class="mt-2">&copy; 2025 3D Music Player. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- API Configuration ---
+        const API_URL = 'http://localhost:3000';
+
+        // --- Core Music Player Logic ---
+        const audio = new Audio();
+        let currentTrackIndex = 0;
+        let playlist = [];
+        let repeatMode = 'none'; // 'none', 'one', 'all'
+        let isShuffled = false;
+        let originalPlaylist = [];
+
+        // Web Audio API for Visualization
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let audioSource;
+        const analyser = audioContext.createAnalyser();
+
+        // DOM Elements
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const shuffleBtn = document.getElementById('shuffle-btn');
+        const repeatBtn = document.getElementById('repeat-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const trackTitle = document.getElementById('track-title');
+        const trackArtist = document.getElementById('track-artist');
+        const currentTimeEl = document.getElementById('current-time');
+        const durationEl = document.getElementById('duration');
+        const volumeSlider = document.getElementById('volume-slider');
+        const fileInput = document.getElementById('music-file-input');
+        const playlistContainer = document.querySelector('#playlist-container');
+        const dropArea = document.getElementById('drop-area');
+        const savePlaylistBtn = document.getElementById('save-playlist-btn');
+        const loadPlaylistsBtn = document.getElementById('load-playlists-btn');
+        const savedPlaylistsList = document.getElementById('saved-playlists-list');
+        const dropAreaText = document.querySelector('#drop-area p');
+
+        // Function to format time
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // Load a specific track
+        function loadTrack(index) {
+            if (playlist.length > 0) {
+                currentTrackIndex = index;
+                const track = playlist[currentTrackIndex];
+                const trackUrl = track.file instanceof File ? URL.createObjectURL(track.file) : `${API_URL}/uploads/${track.filePath}`;
+                audio.src = trackUrl;
+                trackTitle.textContent = track.name;
+                trackArtist.textContent = track.artist || 'Local File';
+                audio.load();
+
+                // Connect to Web Audio API for visualization
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                if (!audioSource) {
+                    audioSource = audioContext.createMediaElementSource(audio);
+                    audioSource.connect(analyser);
+                    analyser.connect(audioContext.destination);
+                }
+
+                updatePlaylistDisplay();
+            } else {
+                trackTitle.textContent = 'No Songs in Playlist';
+                trackArtist.textContent = 'Add a song to start';
+                audio.src = '';
+                updatePlaylistDisplay();
+            }
+        }
+
+        // Play/Pause logic
+        function togglePlayPause() {
+            if (playlist.length === 0) return;
+
+            if (audio.paused) {
+                audio.play();
+                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            } else {
+                audio.pause();
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            }
+        }
+        
+        // Update playlist display on the DOM
+        function updatePlaylistDisplay() {
+            playlistContainer.innerHTML = '';
+            if (playlist.length === 0) {
+                playlistContainer.innerHTML = '<p class="text-center text-muted m-3">No songs in the playlist.</p>';
+                return;
+            }
+            playlist.forEach((track, index) => {
+                const item = document.createElement('div');
+                item.classList.add('playlist-item');
+                if (index === currentTrackIndex) {
+                    item.classList.add('active');
+                }
+                item.innerHTML = `
+                    <span class="playlist-item-title">${track.name}</span>
+                    <button class="delete-btn" data-index="${index}"><i class="fas fa-trash"></i></button>
+                `;
+                item.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'I') {
+                        loadTrack(index);
+                        togglePlayPause();
+                    }
+                });
+                item.querySelector('.delete-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteTrack(index);
+                });
+                playlistContainer.appendChild(item);
+            });
+        }
+
+        // Delete a track from the playlist
+        function deleteTrack(index) {
+            playlist.splice(index, 1);
+            originalPlaylist.splice(index, 1);
+            if (index === currentTrackIndex) {
+                if (playlist.length > 0) {
+                    currentTrackIndex = Math.min(index, playlist.length - 1);
+                    loadTrack(currentTrackIndex);
+                    togglePlayPause();
+                } else {
+                    audio.pause();
+                    audio.src = '';
+                    trackTitle.textContent = 'No Songs in Playlist';
+                    trackArtist.textContent = '';
+                }
+            } else if (index < currentTrackIndex) {
+                currentTrackIndex--;
+            }
+            updatePlaylistDisplay();
+        }
+
+        // Shuffle the playlist
+        function shufflePlaylist() {
+            if (isShuffled) {
+                playlist = [...originalPlaylist];
+                shuffleBtn.classList.remove('active');
+            } else {
+                const shuffledPlaylist = [...playlist];
+                for (let i = shuffledPlaylist.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffledPlaylist[i], shuffledPlaylist[j]] = [shuffledPlaylist[j], shuffledPlaylist[i]];
+                }
+                playlist = shuffledPlaylist;
+                shuffleBtn.classList.add('active');
+            }
+            isShuffled = !isShuffled;
+            loadTrack(0);
+            updatePlaylistDisplay();
+            audio.play();
+        }
+
+        // Toggle repeat mode
+        function toggleRepeat() {
+            if (repeatMode === 'none') {
+                repeatMode = 'all';
+                repeatBtn.innerHTML = '<i class="fas fa-redo"></i>';
+                repeatBtn.classList.add('active');
+            } else if (repeatMode === 'all') {
+                repeatMode = 'one';
+                repeatBtn.innerHTML = '<i class="fas fa-redo-alt"></i>';
+            } else {
+                repeatMode = 'none';
+                repeatBtn.classList.remove('active');
+            }
+        }
+
+        // Event Listeners for Controls
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        prevBtn.addEventListener('click', () => {
+            if (playlist.length > 0) {
+                currentTrackIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+                loadTrack(currentTrackIndex);
+                if (!audio.paused) audio.play();
+            }
+        });
+        nextBtn.addEventListener('click', () => {
+            if (playlist.length > 0) {
+                currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
+                loadTrack(currentTrackIndex);
+                if (!audio.paused) audio.play();
+            }
+        });
+        shuffleBtn.addEventListener('click', shufflePlaylist);
+        repeatBtn.addEventListener('click', toggleRepeat);
+
+        // Update progress bar and time display
+        audio.addEventListener('timeupdate', () => {
+            const progressPercent = (audio.currentTime / audio.duration) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+            currentTimeEl.textContent = formatTime(audio.currentTime);
+        });
+
+        // Update duration when song metadata is loaded
+        audio.addEventListener('loadedmetadata', () => {
+            durationEl.textContent = formatTime(audio.duration);
+        });
+
+        // Seek functionality
+        progressContainer.addEventListener('click', (e) => {
+            const width = progressContainer.clientWidth;
+            const clickX = e.offsetX;
+            audio.currentTime = (clickX / width) * audio.duration;
+        });
+
+        // Volume control
+        volumeSlider.addEventListener('input', (e) => {
+            audio.volume = e.target.value / 100;
+        });
+        audio.volume = volumeSlider.value / 100; // Set initial volume
+
+        // Handle end of song
+        audio.addEventListener('ended', () => {
+            if (repeatMode === 'one') {
+                audio.play();
+            } else if (repeatMode === 'all') {
+                currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
+                loadTrack(currentTrackIndex);
+                audio.play();
+            } else {
+                currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
+                if (currentTrackIndex !== 0) {
+                    loadTrack(currentTrackIndex);
+                    audio.play();
+                } else {
+                    loadTrack(currentTrackIndex);
+                    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                }
+            }
+        });
+
+        // Handle file uploads
+        fileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            const newSongs = await uploadFilesToServer(files);
+            playlist = [...playlist, ...newSongs];
+            originalPlaylist = [...originalPlaylist, ...newSongs];
+            if (audio.paused && playlist.length > 0) {
+                currentTrackIndex = 0;
+                loadTrack(currentTrackIndex);
+                togglePlayPause();
+            }
+            updatePlaylistDisplay();
+        });
+
+        // --- Drag and Drop functionality ---
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+        });
+
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        async function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            const newSongs = await uploadFilesToServer(Array.from(files));
+            playlist.push(...newSongs);
+            originalPlaylist.push(...newSongs);
+            if (audio.paused && playlist.length > 0) {
+                currentTrackIndex = 0;
+                loadTrack(currentTrackIndex);
+                togglePlayPause();
+            }
+            updatePlaylistDisplay();
+        }
+
+        // --- Backend Communication Logic ---
+        async function uploadFilesToServer(files) {
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('musicFiles', file);
+            }
+            try {
+                dropAreaText.textContent = 'Uploading...';
+                const response = await fetch(`${API_URL}/api/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const result = await response.json();
+                dropAreaText.textContent = 'Drag and drop music files here';
+                if (response.ok) {
+                    return result.songs;
+                } else {
+                    console.error('Upload failed:', result.message);
+                    return [];
+                }
+            } catch (error) {
+                console.error('Error uploading files:', error);
+                return [];
+            }
+        }
+
+        savePlaylistBtn.addEventListener('click', async () => {
+            const playlistName = prompt("Enter a name for your playlist:");
+            if (!playlistName || playlist.length === 0) return;
+
+            const songsToSave = playlist.map(song => ({ name: song.name, filePath: song.filePath }));
+            
+            try {
+                const response = await fetch(`${API_URL}/api/playlists`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: playlistName, songs: songsToSave })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`Playlist "${result.name}" saved successfully!`);
+                } else {
+                    alert(`Failed to save playlist: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('Error saving playlist:', error);
+                alert('Failed to save playlist. Check console for details.');
+            }
+        });
+
+        loadPlaylistsBtn.addEventListener('click', async () => {
+            if (savedPlaylistsList.style.display === 'block') {
+                savedPlaylistsList.style.display = 'none';
+                return;
+            }
+            try {
+                const response = await fetch(`${API_URL}/api/playlists`);
+                const playlists = await response.json();
+                
+                savedPlaylistsList.innerHTML = '';
+                if (playlists.length > 0) {
+                    playlists.forEach(p => {
+                        const playlistItem = document.createElement('div');
+                        playlistItem.classList.add('playlist-item');
+                        playlistItem.textContent = p.name;
+                        playlistItem.addEventListener('click', () => {
+                            playlist = p.songs;
+                            originalPlaylist = [...p.songs]; // Set original playlist for shuffle
+                            currentTrackIndex = 0;
+                            loadTrack(currentTrackIndex);
+                            togglePlayPause();
+                            savedPlaylistsList.style.display = 'none';
+                        });
+                        savedPlaylistsList.appendChild(playlistItem);
+                    });
+                } else {
+                    savedPlaylistsList.innerHTML = '<p class="text-center text-muted m-3">No saved playlists.</p>';
+                }
+                savedPlaylistsList.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading playlists:', error);
+                savedPlaylistsList.innerHTML = '<p class="text-center text-muted m-3">Failed to load playlists. Is the backend server running?</p>';
+                savedPlaylistsList.style.display = 'block';
+            }
+        });
+
+        // --- Theme Toggle Logic ---
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const body = document.body;
+        themeToggleBtn.addEventListener('click', () => {
+            body.classList.toggle('dark-red-theme');
+            if (body.classList.contains('dark-red-theme')) {
+                material.color.setHex(0xf7a700);
+                particleMaterial.color.setHex(0xffc94d);
+            } else {
+                material.color.setHex(0x992222);
+                particleMaterial.color.setHex(0xff3838);
+            }
+        });
+        
+        // --- Three.js 3D Animation & Visualization ---
+        const scene = new THREE.Scene();
+        const canvas = document.getElementById('visualization-canvas');
+        const renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            alpha: true,
+            antialias: true
+        });
+        renderer.setClearColor(0x000000, 0);
+
+        const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        
+        function resizeCanvas() {
+            const width = canvas.offsetWidth;
+            const height = canvas.offsetHeight;
+            if (canvas.width !== width || canvas.height !== height) {
+                renderer.setSize(width, height, false);
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Audio visualization setup
+        analyser.fftSize = 512; // Increase FFT size for more detail
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        // --- Main Mesh (Audio Reactive) ---
+        const geometry = new THREE.IcosahedronGeometry(2, 3);
+        const originalVertices = geometry.attributes.position.array.slice(0); // Store original vertex positions
+        const material = new THREE.MeshPhongMaterial({
+            color: 0x992222,
+            specular: 0xffffff, // Brighter specular highlights
+            shininess: 50,
+            flatShading: false,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        // --- Particle System (Audio Reactive) ---
+        const particleCount = 2000;
+        const particlesGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        const colors = new Float32Array(particleCount * 3);
+
+        const color = new THREE.Color();
+        for (let i = 0; i < particleCount; i++) {
+            const i3 = i * 3;
+            // Spread particles out in a sphere
+            const r = 5 + Math.random() * 5;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(Math.random() * 2 - 1);
+            positions[i3] = r * Math.sin(phi) * Math.cos(theta);
+            positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+            positions[i3 + 2] = r * Math.cos(phi);
+            
+            sizes[i] = Math.random() * 0.1 + 0.05;
+            color.setHex(0xff3838);
+            color.toArray(colors, i3);
+        }
+
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particlesGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particleMaterial = new THREE.PointsMaterial({
+            vertexColors: true,
+            size: 0.1,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: 0.7
+        });
+        const particleSystem = new THREE.Points(particlesGeometry, particleMaterial);
+        scene.add(particleSystem);
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+
+        camera.position.z = 5;
+
+        // --- Animation loop ---
+        const animate = function () {
+            requestAnimationFrame(animate);
+
+            // Subtle camera animation
+            const time = performance.now() * 0.0001;
+            camera.position.x = 5 * Math.sin(time * 0.5);
+            camera.position.y = 5 * Math.cos(time * 0.4);
+            camera.lookAt(scene.position);
+
+            if (!audio.paused) {
+                analyser.getByteFrequencyData(dataArray);
+
+                // Main Mesh Deformation
+                const positions = mesh.geometry.attributes.position.array;
+                const originalPositions = originalVertices;
+                const lowFreq = dataArray.slice(0, 32).reduce((a, b) => a + b) / 32;
+                const midFreq = dataArray.slice(32, 128).reduce((a, b) => a + b) / 96;
+
+                for (let i = 0; i < positions.length; i += 3) {
+                    const vertex = new THREE.Vector3(originalPositions[i], originalPositions[i + 1], originalPositions[i + 2]);
+                    const magnitude = vertex.length();
+                    const displacement = (lowFreq / 256) * 0.5 + (midFreq / 256) * 0.3;
+
+                    vertex.normalize().multiplyScalar(magnitude + displacement);
+                    positions[i] = vertex.x;
+                    positions[i + 1] = vertex.y;
+                    positions[i + 2] = vertex.z;
+                }
+                mesh.geometry.attributes.position.needsUpdate = true;
+                mesh.geometry.computeVertexNormals();
+
+                // Particle System Reactivity
+                const particlePositions = particleSystem.geometry.attributes.position.array;
+                const particleSizes = particleSystem.geometry.attributes.size.array;
+                const particleColors = particleSystem.geometry.attributes.color.array;
+                
+                const avgVolume = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const i3 = i * 3;
+                    const particleIntensity = dataArray[i % bufferLength] / 256;
+
+                    // Particle attraction/repulsion based on volume
+                    const particlePos = new THREE.Vector3(particlePositions[i3], particlePositions[i3 + 1], particlePositions[i3 + 2]);
+                    const direction = particlePos.clone().normalize();
+                    const speed = 0.05 * particleIntensity;
+                    if (avgVolume > 100) {
+                        // Repel particles
+                        particlePos.add(direction.multiplyScalar(speed));
+                    } else {
+                        // Slowly attract particles
+                        particlePos.sub(direction.multiplyScalar(speed * 0.5));
+                    }
+
+                    // Reset if too far or too close
+                    if (particlePos.length() > 15 || particlePos.length() < 1) {
+                         const r = 5 + Math.random() * 5;
+                         const theta = Math.random() * Math.PI * 2;
+                         const phi = Math.acos(Math.random() * 2 - 1);
+                         particlePos.x = r * Math.sin(phi) * Math.cos(theta);
+                         particlePos.y = r * Math.sin(phi) * Math.sin(theta);
+                         particlePos.z = r * Math.cos(phi);
+                    }
+
+                    particlePositions[i3] = particlePos.x;
+                    particlePositions[i3 + 1] = particlePos.y;
+                    particlePositions[i3 + 2] = particlePos.z;
+
+                    // Size and color change
+                    particleSizes[i] = 0.05 + 0.2 * particleIntensity;
+                    const colorVal = new THREE.Color();
+                    colorVal.setHSL(particleIntensity * 0.5 + 0.5, 0.8, 0.7); // Change color with intensity
+                    colorVal.toArray(particleColors, i3);
+                }
+
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+                particleSystem.geometry.attributes.size.needsUpdate = true;
+                particleSystem.geometry.attributes.color.needsUpdate = true;
+
+            } else {
+                // Reset to original form when paused
+                const positions = mesh.geometry.attributes.position.array;
+                const originalPositions = originalVertices;
+                for (let i = 0; i < positions.length; i++) {
+                    positions[i] = originalPositions[i];
+                }
+                mesh.geometry.attributes.position.needsUpdate = true;
+                mesh.geometry.computeVertexNormals();
+            }
+            
+            renderer.render(scene, camera);
+        };
+        
+        // Start the animation on window load
+        window.onload = function() {
+            animate();
+        };
+
+    </script>
+
+    <!-- Bootstrap JS (optional, for some components) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
